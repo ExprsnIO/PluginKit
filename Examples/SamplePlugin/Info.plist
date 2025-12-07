@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+
+    <key>CFBundleIdentifier</key>
+    <string>com.example.sampleplugin</string>
+
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+
+    <key>CFBundleName</key>
+    <string>Sample Plugin</string>
+
+    <key>CFBundlePackageType</key>
+    <string>BNDL</string>
+
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+
+    <key>CFBundleVersion</key>
+    <string>1</string>
+
+    <!-- PlugInKit Configuration -->
+    <key>PKXPCServiceName</key>
+    <string>com.example.sampleplugin.xpc</string>
+
+    <key>PKPlugInVersion</key>
+    <string>1.0.0</string>
+
+    <key>PKPlugInCapabilities</key>
+    <array>
+        <string>data-processing</string>
+        <string>calculation</string>
+        <string>scripting</string>
+    </array>
+
+    <key>PKMinimumHostVersion</key>
+    <string>1.0</string>
+
+    <!-- XPC Service -->
+    <key>NSExtension</key>
+    <dict>
+        <key>NSExtensionPointIdentifier</key>
+        <string>com.pluginkit.extension</string>
+
+        <key>NSExtensionPrincipalClass</key>
+        <string>SamplePlugin</string>
+    </dict>
+</dict>
+</plist>
