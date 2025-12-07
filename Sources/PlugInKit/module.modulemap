@@ -1,0 +1,34 @@
+module PlugInKit {
+    umbrella header "PlugInKit.h"
+
+    export *
+    module * { export * }
+
+    explicit module Core {
+        header "Core/PKPlugInManager.h"
+        header "Core/PKConnection.h"
+        export *
+    }
+
+    explicit module XPC {
+        header "XPC/PKXPCService.h"
+        export *
+    }
+
+    explicit module Introspection {
+        header "Introspection/PKIntrospector.h"
+        export *
+    }
+
+    explicit module ScriptingBridge {
+        header "ScriptingBridge/PKScriptingDefinitionGenerator.h"
+        export *
+    }
+}
+
+module PlugInKitProtocol {
+    header "../PlugInKitProtocol/PKPlugInProtocol.h"
+    header "../PlugInKitProtocol/PKHostProtocol.h"
+
+    export *
+}

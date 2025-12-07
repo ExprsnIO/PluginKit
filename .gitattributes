@@ -1,0 +1,63 @@
+# Auto detect text files and normalize line endings to LF
+* text=auto eol=lf
+
+# Source code
+*.h text diff=objc
+*.m text diff=objc
+*.mm text diff=objc
+*.swift text diff=swift
+*.c text
+*.cpp text
+*.cc text
+
+# Headers
+*.hpp text
+*.hxx text
+
+# Scripts
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Documentation
+*.md text
+*.txt text
+README text
+LICENSE text
+CONTRIBUTING text
+
+# Xcode
+*.pbxproj text -crlf
+*.xcworkspacedata text
+*.xcscheme text
+
+# Property lists
+*.plist text
+
+# JSON
+*.json text
+
+# XML
+*.xml text
+*.sdef text
+
+# Git
+.gitattributes text
+.gitignore text
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.framework binary
+*.a binary
+*.dylib binary
+*.so binary
+
+# Archives
+*.zip binary
+*.tar binary
+*.gz binary
+*.bz2 binary
