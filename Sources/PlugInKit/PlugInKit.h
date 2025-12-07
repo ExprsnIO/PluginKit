@@ -29,3 +29,8 @@ FOUNDATION_EXPORT const unsigned char PlugInKitVersionString[];
 // Protocols
 #import <PlugInKit/PKPlugInProtocol.h>
 #import <PlugInKit/PKHostProtocol.h>
+
+// Futures
+#import <PlugInKit/PKFuture.h>
+#import <PlugInKit/PKConnection+Futures.h>
+#import <PlugInKit/PKPlugInProtocol+Futures.h>

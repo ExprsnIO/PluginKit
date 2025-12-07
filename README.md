@@ -6,12 +6,13 @@ A modern, extensible plugin framework for macOS with XPC-based communication, in
 
 - ✨ **Modern API Design**: Network.framework-inspired architecture with state management and completion handlers
 - 🔌 **Bidirectional Communication**: Full XPC-based communication between host and plugins
+- 🔮 **Futures/Promises**: Complete futures implementation with then, catch, while, and composition over XPC
 - 🔍 **Method Introspection**: Discover and analyze plugin capabilities at runtime
 - 📝 **Scripting Bridge**: Auto-generate AppleScript and JavaScript definitions
 - 💓 **Connection Health Monitoring**: Automatic polling with latency tracking
 - 🎯 **Selective Method Exposure**: Control which methods are exposed to scripting environments
 - 🛡️ **Type-Safe**: Objective-C protocols with NSSecureCoding support
-- 🚀 **Swift Compatible**: Full Swift interoperability with modern patterns
+- 🚀 **Swift Compatible**: Full Swift interoperability with async/await and Combine
 
 ## Architecture
 
@@ -36,6 +37,14 @@ PlugInKit consists of several key components:
 ### Scripting Bridge
 
 - **PKScriptingDefinitionGenerator**: Generates AppleScript, JavaScript, and SDEF definitions
+
+### Futures
+
+- **PKFuture**: Composable futures/promises for async XPC operations
+- **Chaining**: then, map, flatMap, catch, finally
+- **Composition**: all, any, race, sequence, zip
+- **Iteration**: while, repeat, forEach
+- **Swift Support**: async/await integration, Combine publishers, type-safe wrappers
 
 ## Quick Start
 
