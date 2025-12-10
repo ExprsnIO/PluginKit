@@ -15,7 +15,11 @@ FOUNDATION_EXPORT const unsigned char PlugInKitVersionString[];
 
 // Core
 #import <PlugInKit/PKPlugInManager.h>
+#import <PlugInKit/PKPlugInManager+Compatibility.h>
+#import <PlugInKit/PKPlugInManager+HotReload.h>
 #import <PlugInKit/PKConnection.h>
+#import <PlugInKit/PKError.h>
+#import <PlugInKit/PKLogger.h>
 
 // XPC
 #import <PlugInKit/PKXPCService.h>
@@ -32,5 +36,8 @@ FOUNDATION_EXPORT const unsigned char PlugInKitVersionString[];
 
 // Futures
 #import <PlugInKit/PKFuture.h>
+#import <PlugInKit/PKFuture+Cancellation.h>
+#import <PlugInKit/PKFuture+Progress.h>
+#import <PlugInKit/PKCancellationToken.h>
 #import <PlugInKit/PKConnection+Futures.h>
 #import <PlugInKit/PKPlugInProtocol+Futures.h>

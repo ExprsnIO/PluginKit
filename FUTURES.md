@@ -11,6 +11,8 @@ Complete guide to using futures/promises in PlugInKit for asynchronous XPC commu
 - [Composition](#composition)
 - [Iteration](#iteration)
 - [Timing](#timing)
+- [Cancellation](#cancellation)
+- [Progress Reporting](#progress-reporting)
 - [Plugin Integration](#plugin-integration)
 - [Swift Support](#swift-support)
 - [Advanced Patterns](#advanced-patterns)
@@ -23,6 +25,8 @@ PKFuture provides a powerful, composable abstraction for asynchronous operations
 - **all/any/race** - Composition of multiple futures
 - **while/repeat/forEach** - Iteration patterns
 - **timeout/delay** - Timing control
+- **Cancellation** - Cancel in-flight operations with tokens
+- **Progress reporting** - Track operation progress with NSProgress
 - **Full XPC support** - NSSecureCoding for seamless plugin communication
 - **Swift integration** - async/await, Combine, and type-safe wrappers
 
@@ -308,6 +312,363 @@ Create future that resolves after delay:
 
 ```objc
 PKFuture *delayed = [PKFuture after:3.0 value:@"delayed value"];
+```
+
+## Cancellation
+
+### PKCancellationToken
+
+Cancel asynchronous operations gracefully:
+
+```objc
+PKCancellationToken *token = [[PKCancellationToken alloc] init];
+
+// Register cancellation callback
+[token onCancelled:^{
+    NSLog(@"Operation cancelled");
+    [self cleanup];
+}];
+
+// Cancel the operation
+[token cancel];
+
+// Check if cancelled
+if (token.isCancelled) {
+    // Handle cancellation
+}
+```
+
+### Cancelling Futures
+
+Attach a cancellation token to a future:
+
+```objc
+PKCancellationToken *token = [[PKCancellationToken alloc] init];
+
+PKFuture *future = [[connection sendMessage:@{@"action": @"process"}]
+    attachCancellationToken:token];
+
+[future onSuccess:^(id result) {
+    NSLog(@"Completed: %@", result);
+}];
+
+[future onCancelled:^{
+    NSLog(@"Future was cancelled");
+}];
+
+// Cancel the operation
+[token cancel]; // Triggers onCancelled and rejects future with PKErrorOperationCancelled
+```
+
+### Direct Future Cancellation
+
+Cancel a future directly without a token:
+
+```objc
+PKFuture *future = [connection sendMessage:message];
+
+[future onCancelled:^{
+    NSLog(@"Cancelled");
+}];
+
+// Later...
+[future cancel]; // Rejects with cancellation error
+```
+
+### Creating Cancellable Futures
+
+Create a future that respects cancellation:
+
+```objc
+PKCancellationToken *token = [[PKCancellationToken alloc] init];
+
+PKFuture *future = [PKFuture futureWithResolver:^(void (^fulfill)(id),
+                                                   void (^reject)(NSError *),
+                                                   PKCancellationToken *token) {
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        for (int i = 0; i < 100; i++) {
+            // Check cancellation periodically
+            if (token.isCancelled) {
+                NSError *error = [NSError pk_errorWithCode:PKErrorOperationCancelled
+                                               description:@"Operation cancelled"];
+                reject(error);
+                return;
+            }
+
+            // Do work
+            [self processItem:i];
+        }
+
+        fulfill(@"completed");
+    });
+} cancellationToken:token];
+
+// Can cancel anytime
+[token cancel];
+```
+
+### Linked Cancellation Tokens
+
+Create a token that cancels when any parent cancels:
+
+```objc
+PKCancellationToken *token1 = [[PKCancellationToken alloc] init];
+PKCancellationToken *token2 = [[PKCancellationToken alloc] init];
+
+// Linked token cancels if either parent cancels
+PKCancellationToken *linkedToken = [PKCancellationToken linkedTokenWithTokens:@[token1, token2]];
+
+[linkedToken onCancelled:^{
+    NSLog(@"One of the parent tokens was cancelled");
+}];
+
+[token1 cancel]; // Triggers linkedToken cancellation
+```
+
+### Cancellation with Plugin Operations
+
+Cancel long-running plugin operations:
+
+```objc
+PKConnection *connection = [self connectionForPlugIn:identifier];
+PKCancellationToken *token = [[PKCancellationToken alloc] init];
+
+PKFuture *future = [[connection sendMessage:@{
+    @"action": @"processLargeFile",
+    @"path": @"/path/to/file"
+}] attachCancellationToken:token];
+
+// Show cancel button
+self.cancelButton.enabled = YES;
+self.cancelButton.target = self;
+self.cancelButton.action = @selector(cancelOperation:);
+self.currentToken = token;
+
+// Later, when user clicks cancel
+- (void)cancelOperation:(id)sender {
+    [self.currentToken cancel];
+    self.cancelButton.enabled = NO;
+}
+```
+
+## Progress Reporting
+
+### Basic Progress Tracking
+
+Track operation progress with NSProgress:
+
+```objc
+PKFuture *future = [PKFuture futureWithTotalUnitCount:100
+                                             resolver:^(void (^fulfill)(id),
+                                                        void (^reject)(NSError *),
+                                                        NSProgress *progress) {
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        for (int i = 0; i <= 100; i++) {
+            // Update progress
+            progress.completedUnitCount = i;
+
+            // Do work
+            [NSThread sleepForTimeInterval:0.1];
+        }
+
+        fulfill(@"done");
+    });
+}];
+
+// Observe progress
+[future reportProgress:^(NSProgress *progress) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        self.progressBar.progress = progress.fractionCompleted;
+        self.statusLabel.text = [NSString stringWithFormat:@"%.0f%%",
+                                progress.fractionCompleted * 100];
+    });
+}];
+```
+
+### Progress with Custom Units
+
+Use meaningful unit counts:
+
+```objc
+NSArray *files = @[@"file1.txt", @"file2.txt", @"file3.txt"];
+
+PKFuture *future = [PKFuture futureWithTotalUnitCount:files.count
+                                             resolver:^(void (^fulfill)(id),
+                                                        void (^reject)(NSError *),
+                                                        NSProgress *progress) {
+    progress.localizedDescription = @"Processing files";
+
+    for (NSInteger i = 0; i < files.count; i++) {
+        [self processFile:files[i]];
+        progress.completedUnitCount = i + 1;
+        progress.localizedAdditionalDescription = [NSString stringWithFormat:@"%@ of %@",
+                                                   @(i + 1), @(files.count)];
+    }
+
+    fulfill(@"all files processed");
+}];
+```
+
+### Attaching Progress to Existing Futures
+
+Add progress to any future:
+
+```objc
+PKFuture *future = [connection sendMessage:message];
+NSProgress *progress = [NSProgress progressWithTotalUnitCount:100];
+
+[[future withProgress:progress]
+    reportProgress:^(NSProgress *p) {
+        NSLog(@"Progress: %.0f%%", p.fractionCompleted * 100);
+    }];
+
+// Update progress elsewhere
+progress.completedUnitCount = 50;
+```
+
+### Progress with Cancellation
+
+Combine progress and cancellation:
+
+```objc
+PKCancellationToken *token = [[PKCancellationToken alloc] init];
+
+PKFuture *future = [PKFuture futureWithTotalUnitCount:1000
+                                             resolver:^(void (^fulfill)(id),
+                                                        void (^reject)(NSError *),
+                                                        NSProgress *progress) {
+    for (int i = 0; i < 1000; i++) {
+        // Check cancellation
+        if (token.isCancelled) {
+            NSError *error = [NSError pk_errorWithCode:PKErrorOperationCancelled
+                                           description:@"User cancelled"];
+            reject(error);
+            return;
+        }
+
+        // Update progress
+        progress.completedUnitCount = i;
+
+        // Do work
+        [self processItem:i];
+    }
+
+    fulfill(@"completed");
+}];
+
+[[future attachCancellationToken:token]
+    reportProgress:^(NSProgress *progress) {
+        self.progressBar.progress = progress.fractionCompleted;
+    }];
+
+// User can cancel
+[token cancel];
+```
+
+### Hierarchical Progress
+
+Create parent-child progress relationships:
+
+```objc
+NSProgress *parentProgress = [NSProgress progressWithTotalUnitCount:3];
+
+// Child task 1
+[parentProgress becomeCurrentWithPendingUnitCount:1];
+PKFuture *task1 = [PKFuture futureWithProgress:^(void (^fulfill)(id),
+                                                  void (^reject)(NSError *),
+                                                  NSProgress *progress) {
+    progress.totalUnitCount = 100;
+    // Do work...
+    fulfill(@"task1 done");
+}];
+[parentProgress resignCurrent];
+
+// Child task 2
+[parentProgress becomeCurrentWithPendingUnitCount:1];
+PKFuture *task2 = [PKFuture futureWithProgress:^(void (^fulfill)(id),
+                                                  void (^reject)(NSError *),
+                                                  NSProgress *progress) {
+    progress.totalUnitCount = 200;
+    // Do work...
+    fulfill(@"task2 done");
+}];
+[parentProgress resignCurrent];
+
+// Child task 3
+[parentProgress becomeCurrentWithPendingUnitCount:1];
+PKFuture *task3 = [PKFuture futureWithProgress:^(void (^fulfill)(id),
+                                                  void (^reject)(NSError *),
+                                                  NSProgress *progress) {
+    progress.totalUnitCount = 50;
+    // Do work...
+    fulfill(@"task3 done");
+}];
+[parentProgress resignCurrent];
+
+// Observe overall progress
+[parentProgress addObserver:self
+                 forKeyPath:@"fractionCompleted"
+                    options:NSKeyValueObservingOptionNew
+                    context:NULL];
+```
+
+### Progress with Plugin Operations
+
+Report progress from plugin operations:
+
+```objc
+PKConnection *connection = [self connectionForPlugIn:identifier];
+
+// Send message requesting progress updates
+id<PKPlugInProtocol> plugin = [connection remotePlugInWithErrorHandler:^(NSError *error) {
+    NSLog(@"Error: %@", error);
+}];
+
+NSProgress *progress = [NSProgress progressWithTotalUnitCount:100];
+
+[plugin handleMessage:@{
+    @"action": @"processWithProgress",
+    @"data": someData
+} reply:^(NSDictionary *response, NSError *error) {
+    if (error) {
+        NSLog(@"Error: %@", error);
+    } else {
+        NSLog(@"Complete: %@", response);
+    }
+}];
+
+// Plugin can send progress updates via notifications
+// or separate progress channel
+```
+
+### KVO Progress Observation
+
+Use KVO for fine-grained progress monitoring:
+
+```objc
+PKFuture *future = [PKFuture futureWithTotalUnitCount:100
+                                             resolver:^(void (^fulfill)(id),
+                                                        void (^reject)(NSError *),
+                                                        NSProgress *progress) {
+    // Long operation...
+}];
+
+NSProgress *progress = future.progress;
+
+[progress addObserver:self
+           forKeyPath:@"fractionCompleted"
+              options:NSKeyValueObservingOptionNew
+              context:NULL];
+
+- (void)observeValueForKeyPath:(NSString *)keyPath
+                      ofObject:(id)object
+                        change:(NSDictionary *)change
+                       context:(void *)context {
+    if ([keyPath isEqualToString:@"fractionCompleted"]) {
+        NSProgress *progress = (NSProgress *)object;
+        NSLog(@"Progress: %.2f%%", progress.fractionCompleted * 100);
+    }
+}
 ```
 
 ## Plugin Integration
@@ -630,6 +991,12 @@ retryBlock();
 6. **Type safety in Swift** - Use `Future<T>` wrapper for type safety
 7. **Retry wisely** - Use exponential backoff for retries
 8. **Composition over complexity** - Use `all`/`sequence` instead of manual orchestration
+9. **Make operations cancellable** - Provide cancellation tokens for long-running operations
+10. **Check cancellation periodically** - In loops and long operations, check `token.isCancelled`
+11. **Report meaningful progress** - Use appropriate total unit counts and localized descriptions
+12. **Combine cancellation and progress** - Long operations should support both
+13. **Clean up on cancellation** - Use `onCancelled` to release resources
+14. **Don't forget progress completion** - Ensure `completedUnitCount` reaches `totalUnitCount`
 
 ## Performance Tips
 
