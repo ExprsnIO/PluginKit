@@ -29,6 +29,7 @@ FOUNDATION_EXPORT const unsigned char PlugInKitVersionString[];
 
 // Scripting Bridge
 #import <PlugInKit/PKScriptingDefinitionGenerator.h>
+#import <PlugInKit/PKScriptingLedgerWrapper.h>
 
 // Protocols
 #import <PlugInKit/PKPlugInProtocol.h>
