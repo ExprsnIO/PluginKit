@@ -9,6 +9,7 @@ A modern, extensible plugin framework for macOS with XPC-based communication, in
 - 🔮 **Futures/Promises**: Complete futures implementation with then, catch, while, and composition over XPC
 - 🔍 **Method Introspection**: Discover and analyze plugin capabilities at runtime
 - 📝 **Scripting Bridge**: Auto-generate AppleScript and JavaScript definitions
+- 🏗️ **LLVM AST Parser**: Full SDEF parsing with validation and registry system
 - 💓 **Connection Health Monitoring**: Automatic polling with latency tracking
 - 🎯 **Selective Method Exposure**: Control which methods are exposed to scripting environments
 - 🛡️ **Type-Safe**: Objective-C protocols with NSSecureCoding support
@@ -37,6 +38,12 @@ PlugInKit consists of several key components:
 ### Scripting Bridge
 
 - **PKScriptingDefinitionGenerator**: Generates AppleScript, JavaScript, and SDEF definitions
+- **PKScriptingLedger**: LLVM-based AST parser, validator, and registry for scripting definitions
+  - Full SDEF XML parsing with error reporting
+  - Semantic validation with detailed diagnostics
+  - Query interface for commands, classes, and types
+  - Bidirectional code generation (parse and generate)
+  - Centralized registry for managing multiple definitions
 
 ### Futures
 
@@ -228,6 +235,48 @@ NSString *sdef = [PKScriptingDefinitionGenerator
                                            toURL:url
                                            error:&error];
 ```
+
+### LLVM-based Scripting Ledger
+
+Parse, validate, and manage scripting definitions with the new LLVM-based ledger system:
+
+```objective-c
+// Create or use shared ledger
+PKScriptingLedger *ledger = [PKScriptingLedger sharedLedger];
+
+// Register a scripting definition
+[ledger registerDefinition:@"com.example.plugin"
+                    source:sdefXML
+                    format:PKScriptingFormatSDEF
+                  filename:@"plugin.sdef"
+                     error:&error];
+
+// Validate
+PKValidationResult *validation = [ledger validateDefinition:@"com.example.plugin"];
+if (!validation.isValid) {
+    for (PKValidationIssue *issue in validation.issues) {
+        NSLog(@"%@", issue);
+    }
+}
+
+// Query commands and classes
+NSDictionary *cmdInfo = [ledger findCommand:@"process data"
+                               inDefinition:@"com.example.plugin"];
+NSLog(@"Command: %@, Return type: %@", cmdInfo[@"name"], cmdInfo[@"returnType"]);
+
+// Pattern matching
+NSArray *commands = [ledger findCommandsMatchingPattern:@"process.*"];
+
+// Generate code
+NSString *generatedSDEF = [ledger generateSDEF:@"com.example.plugin"];
+NSString *appleScript = [ledger generateAppleScript:@"com.example.plugin"];
+
+// Statistics
+NSLog(@"Total commands: %lu", ledger.totalCommandCount);
+NSLog(@"Total classes: %lu", ledger.totalClassCount);
+```
+
+See [SCRIPTING_LEDGER.md](SCRIPTING_LEDGER.md) for complete documentation.
 
 ## Method Exposure Control
 

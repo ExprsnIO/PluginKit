@@ -34,6 +34,15 @@ let package = Package(
                 .headerSearchPath("XPC"),
                 .headerSearchPath("Introspection"),
                 .headerSearchPath("ScriptingBridge"),
+            ],
+            cxxSettings: [
+                .headerSearchPath("."),
+                .headerSearchPath("ScriptingBridge"),
+                .define("__STDC_CONSTANT_MACROS"),
+                .define("__STDC_LIMIT_MACROS"),
+            ],
+            linkerSettings: [
+                .linkedLibrary("c++")
             ]
         ),
 
