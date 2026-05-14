@@ -8,7 +8,20 @@
 #import <Foundation/Foundation.h>
 #import "PKPlugInManager.h"
 
+@class PKPlugInState;
+
 NS_ASSUME_NONNULL_BEGIN
+
+/// Posted on the main queue when a plugin reload completes successfully and the
+/// reload was performed with `PKReloadOptionsNotifyClients`. The notification
+/// object is the `PKPlugInManager`; `userInfo` contains
+/// `PKPlugInReloadIdentifierKey`, `PKPlugInReloadOldVersionKey`, and
+/// `PKPlugInReloadNewVersionKey`.
+FOUNDATION_EXPORT NSNotificationName const PKPlugInDidReloadNotification;
+
+FOUNDATION_EXPORT NSString *const PKPlugInReloadIdentifierKey;
+FOUNDATION_EXPORT NSString *const PKPlugInReloadOldVersionKey;
+FOUNDATION_EXPORT NSString *const PKPlugInReloadNewVersionKey;
 
 /// State of a plugin reload operation
 typedef NS_ENUM(NSInteger, PKReloadState) {
@@ -51,12 +64,28 @@ typedef NS_OPTIONS(NSUInteger, PKReloadOptions) {
              options:(PKReloadOptions)options
           completion:(void (^)(BOOL success, NSError * _Nullable error))completion;
 
-/// Reload a plugin with state migration
+/// Reload a plugin with state migration.
+///
+/// Deprecated: prefer `reloadPlugIn:withStateEnvelopeMigration:completion:`,
+/// which uses the NSSecureCoding `PKPlugInState` envelope.
 /// @param identifier Plugin identifier
 /// @param stateMigrationHandler Block to migrate state from old to new instance
 /// @param completion Completion handler
 - (void)reloadPlugIn:(NSString *)identifier
 withStateMigration:(nullable NSDictionary * (^)(NSDictionary *oldState))stateMigrationHandler
+          completion:(void (^)(BOOL success, NSError * _Nullable error))completion
+    __attribute__((deprecated("Use -reloadPlugIn:withStateEnvelopeMigration:completion: instead")));
+
+/// Reload a plugin, migrating its state through a `PKPlugInState` envelope.
+///
+/// Uses `PKReloadOptionsDefault`. The migration handler receives the state
+/// envelope captured from the old instance (or nil if none was available) and
+/// returns the envelope to hand to the new instance.
+/// @param identifier Plugin identifier
+/// @param stateMigrationHandler Block to migrate the state envelope
+/// @param completion Completion handler
+- (void)reloadPlugIn:(NSString *)identifier
+withStateEnvelopeMigration:(nullable PKPlugInState * _Nullable (^)(PKPlugInState * _Nullable oldState))stateMigrationHandler
           completion:(void (^)(BOOL success, NSError * _Nullable error))completion;
 
 /// Check if a plugin has updates available

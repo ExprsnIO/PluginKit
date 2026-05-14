@@ -125,6 +125,16 @@
     return proxy;
 }
 
+- (pid_t)remoteProcessIdentifier {
+    __block pid_t pid = 0;
+    dispatch_sync(self.internalQueue, ^{
+        if (self.connection) {
+            pid = self.connection.processIdentifier;
+        }
+    });
+    return pid;
+}
+
 - (void)exportObject:(id)object withInterface:(NSXPCInterface *)interface {
     dispatch_async(self.internalQueue, ^{
         if (self.connection) {

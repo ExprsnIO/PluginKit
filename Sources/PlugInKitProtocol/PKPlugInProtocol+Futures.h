@@ -38,6 +38,24 @@ NS_ASSUME_NONNULL_BEGIN
 /// @return Future that completes with capabilities dictionary
 - (PKFuture<NSDictionary<NSString *, id> *> *)capabilitiesFuture;
 
+/// Lifecycle hook: about to load (future-based)
+- (PKFuture<NSNull *> *)willLoadFuture;
+
+/// Lifecycle hook: did load (future-based)
+- (PKFuture<NSNull *> *)didLoadFuture;
+
+/// Lifecycle hook: about to unload (future-based)
+- (PKFuture<NSNull *> *)willUnloadFuture;
+
+/// Lifecycle hook: did unload (future-based)
+- (PKFuture<NSNull *> *)didUnloadFuture;
+
+/// Lifecycle hook: about to suspend (future-based)
+- (PKFuture<NSNull *> *)willSuspendFuture;
+
+/// Lifecycle hook: did resume (future-based)
+- (PKFuture<NSNull *> *)didResumeFuture;
+
 /// Execute a remote procedure call
 /// @param selector Method selector
 /// @param arguments Array of arguments

@@ -80,6 +80,35 @@ typedef NS_OPTIONS(NSUInteger, PKMethodExposureOptions) {
 /// @param reply Completion handler returning capabilities dictionary
 - (void)capabilitiesWithReply:(void (^)(NSDictionary<NSString *, id> *capabilities))reply;
 
+// MARK: - Lifecycle Hooks
+
+/// Called immediately before the plugin connection is fully established,
+/// after the XPC connection is up but before `initializeWithConfiguration:reply:`.
+/// @param reply Completion handler called when the plugin is ready to load
+- (void)willLoadWithReply:(void (^)(NSError * _Nullable error))reply;
+
+/// Called after the plugin has been initialized and the connection is established.
+/// @param reply Completion handler called when post-load setup is complete
+- (void)didLoadWithReply:(void (^)(NSError * _Nullable error))reply;
+
+/// Called before the plugin connection is torn down, before
+/// `prepareForTerminationWithReply:`.
+/// @param reply Completion handler called when the plugin is ready to unload
+- (void)willUnloadWithReply:(void (^)(NSError * _Nullable error))reply;
+
+/// Called after the plugin connection has been torn down.
+/// @param reply Completion handler called when post-unload cleanup is complete
+- (void)didUnloadWithReply:(void (^)(NSError * _Nullable error))reply;
+
+/// Called when the host suspends the plugin. The plugin should pause work and
+/// release transient resources; it will not receive messages while suspended.
+/// @param reply Completion handler called when the plugin has suspended
+- (void)willSuspendWithReply:(void (^)(NSError * _Nullable error))reply;
+
+/// Called when the host resumes a previously suspended plugin.
+/// @param reply Completion handler called when the plugin has resumed
+- (void)didResumeWithReply:(void (^)(NSError * _Nullable error))reply;
+
 @end
 
 NS_ASSUME_NONNULL_END

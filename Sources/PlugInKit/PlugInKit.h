@@ -17,7 +17,10 @@ FOUNDATION_EXPORT const unsigned char PlugInKitVersionString[];
 #import <PlugInKit/PKPlugInManager.h>
 #import <PlugInKit/PKPlugInManager+Compatibility.h>
 #import <PlugInKit/PKPlugInManager+HotReload.h>
+#import <PlugInKit/PKPlugInManager+Lifecycle.h>
+#import <PlugInKit/PKPlugInManager+ResourceManagement.h>
 #import <PlugInKit/PKConnection.h>
+#import <PlugInKit/PKConnection+ResourceLimits.h>
 #import <PlugInKit/PKError.h>
 #import <PlugInKit/PKLogger.h>
 
@@ -34,6 +37,15 @@ FOUNDATION_EXPORT const unsigned char PlugInKitVersionString[];
 // Protocols
 #import <PlugInKit/PKPlugInProtocol.h>
 #import <PlugInKit/PKHostProtocol.h>
+#import <PlugInKit/PKPlugInState.h>
+#import <PlugInKit/PKPlugInDependency.h>
+
+// Core (dependency management)
+#import <PlugInKit/PKPlugInManager+Dependencies.h>
+
+// Futures variants for lifecycle and dependency APIs
+#import <PlugInKit/PKPlugInManager+Lifecycle+Futures.h>
+#import <PlugInKit/PKPlugInManager+Dependencies+Futures.h>
 
 // Futures
 #import <PlugInKit/PKFuture.h>

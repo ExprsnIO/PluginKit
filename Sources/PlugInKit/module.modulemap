@@ -29,6 +29,8 @@ module PlugInKit {
 module PlugInKitProtocol {
     header "../PlugInKitProtocol/PKPlugInProtocol.h"
     header "../PlugInKitProtocol/PKHostProtocol.h"
+    header "../PlugInKitProtocol/PKPlugInState.h"
+    header "../PlugInKitProtocol/PKPlugInDependency.h"
 
     export *
 }

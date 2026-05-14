@@ -6,6 +6,8 @@
 //
 
 #import "PKConnection.h"
+#import "PKError.h"
+#import "PKLogger.h"
 #import "../../PlugInKitProtocol/PKPlugInProtocol.h"
 
 static const NSUInteger kPKConnectionLatencySampleSize = 10;
@@ -21,6 +23,11 @@ static const NSUInteger kPKConnectionLatencySampleSize = 10;
 @property (nonatomic, strong) NSMutableArray<NSNumber *> *latencySamples;
 @property (nonatomic, assign, readwrite) NSTimeInterval averageLatency;
 @property (nonatomic, assign) NSUInteger consecutiveFailures;
+
+// Lifecycle / suspension state
+@property (nonatomic, assign, readwrite, getter=isSuspended) BOOL suspended;
+@property (nonatomic, strong) NSCondition *operationCondition;
+@property (nonatomic, assign) NSUInteger inFlightCount;
 
 @end
 
@@ -38,6 +45,7 @@ static const NSUInteger kPKConnectionLatencySampleSize = 10;
         _unhealthyLatencyThreshold = 3.0;
         _latencySamples = [NSMutableArray arrayWithCapacity:kPKConnectionLatencySampleSize];
         _pollQueue = dispatch_queue_create("com.pluginkit.connection.poll", DISPATCH_QUEUE_SERIAL);
+        _operationCondition = [[NSCondition alloc] init];
 
         _xpcService = [[PKXPCService alloc] initWithServiceName:serviceName
                                                       interface:interface
@@ -216,6 +224,154 @@ static const NSUInteger kPKConnectionLatencySampleSize = 10;
 
 - (id<PKPlugInProtocol>)synchronousRemotePlugInWithErrorHandler:(void (^)(NSError *error))errorHandler {
     return (id<PKPlugInProtocol>)[self.xpcService synchronousRemoteObjectProxyWithErrorHandler:errorHandler];
+}
+
+- (pid_t)remoteProcessIdentifier {
+    return self.xpcService.remoteProcessIdentifier;
+}
+
+#pragma mark - Operation Tracking
+
+- (NSUInteger)inFlightOperationCount {
+    [self.operationCondition lock];
+    NSUInteger count = self.inFlightCount;
+    [self.operationCondition unlock];
+    return count;
+}
+
+- (void)beginOperation {
+    [self.operationCondition lock];
+    self.inFlightCount++;
+    [self.operationCondition unlock];
+}
+
+- (void)endOperation {
+    [self.operationCondition lock];
+    if (self.inFlightCount > 0) {
+        self.inFlightCount--;
+    }
+    if (self.inFlightCount == 0) {
+        [self.operationCondition broadcast];
+    }
+    [self.operationCondition unlock];
+}
+
+#pragma mark - Suspension
+
+- (void)suspendWithDrainTimeout:(NSTimeInterval)drainTimeout
+                     completion:(void (^)(NSError * _Nullable error))completion {
+    PKLogger *logger = [PKLogger loggerWithCategory:@"Connection"];
+
+    if (self.isSuspended) {
+        if (completion) completion(nil);
+        return;
+    }
+
+    if (self.state != PKXPCConnectionStateConnected) {
+        NSError *error = [NSError pk_errorWithCode:PKErrorInvalidState
+                                       description:@"Cannot suspend a connection that is not connected"];
+        if (completion) completion(error);
+        return;
+    }
+
+    [logger debug:@"[%@] Suspending (drain timeout %.1fs)", self.plugInIdentifier, drainTimeout];
+
+    // Drain in-flight operations up to the timeout.
+    [self.operationCondition lock];
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:drainTimeout];
+    while (self.inFlightCount > 0) {
+        if (![self.operationCondition waitUntilDate:deadline]) {
+            break;
+        }
+    }
+    BOOL drained = (self.inFlightCount == 0);
+    [self.operationCondition unlock];
+
+    NSError *drainError = nil;
+    if (!drained) {
+        [logger warning:@"[%@] Suspend drain timed out with %lu operation(s) in flight",
+         self.plugInIdentifier, (unsigned long)self.inFlightOperationCount];
+        drainError = [NSError pk_errorWithCode:PKErrorOperationTimedOut
+                                   description:@"In-flight operations did not drain before suspension"];
+    }
+
+    void (^finishSuspension)(void) = ^{
+        self.suspended = YES;
+        self.state = PKXPCConnectionStateSuspended;
+        [self stopPolling];
+
+        if ([self.delegate respondsToSelector:@selector(connection:didChangeState:)]) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self.delegate connection:self didChangeState:PKXPCConnectionStateSuspended];
+            });
+        }
+
+        [logger info:@"[%@] Suspended", self.plugInIdentifier];
+        if (completion) completion(drainError);
+    };
+
+    id<PKPlugInProtocol> plugin = [self remotePlugInWithErrorHandler:^(NSError *error) {
+        [logger error:@"[%@] willSuspend failed: %@", self.plugInIdentifier, error];
+        finishSuspension();
+    }];
+
+    if ([plugin respondsToSelector:@selector(willSuspendWithReply:)]) {
+        [plugin willSuspendWithReply:^(NSError * _Nullable error) {
+            if (error) {
+                [logger warning:@"[%@] Plugin reported error during willSuspend: %@",
+                 self.plugInIdentifier, error];
+            }
+            finishSuspension();
+        }];
+    } else {
+        finishSuspension();
+    }
+}
+
+- (void)resumeWithCompletion:(void (^)(NSError * _Nullable error))completion {
+    PKLogger *logger = [PKLogger loggerWithCategory:@"Connection"];
+
+    if (!self.isSuspended) {
+        if (completion) completion(nil);
+        return;
+    }
+
+    [logger debug:@"[%@] Resuming", self.plugInIdentifier];
+
+    void (^finishResume)(void) = ^{
+        self.suspended = NO;
+        self.state = PKXPCConnectionStateConnected;
+
+        if ([self.delegate respondsToSelector:@selector(connection:didChangeState:)]) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self.delegate connection:self didChangeState:PKXPCConnectionStateConnected];
+            });
+        }
+
+        if (self.isPollingEnabled) {
+            [self startPolling];
+        }
+
+        [logger info:@"[%@] Resumed", self.plugInIdentifier];
+        if (completion) completion(nil);
+    };
+
+    id<PKPlugInProtocol> plugin = [self remotePlugInWithErrorHandler:^(NSError *error) {
+        [logger error:@"[%@] didResume failed: %@", self.plugInIdentifier, error];
+        finishResume();
+    }];
+
+    if ([plugin respondsToSelector:@selector(didResumeWithReply:)]) {
+        [plugin didResumeWithReply:^(NSError * _Nullable error) {
+            if (error) {
+                [logger warning:@"[%@] Plugin reported error during didResume: %@",
+                 self.plugInIdentifier, error];
+            }
+            finishResume();
+        }];
+    } else {
+        finishResume();
+    }
 }
 
 #pragma mark - PKXPCServiceDelegate

@@ -15,6 +15,8 @@ NSErrorUserInfoKey const PKErrorRequiredVersionKey = @"PKErrorRequiredVersion";
 NSErrorUserInfoKey const PKErrorActualVersionKey = @"PKErrorActualVersion";
 NSErrorUserInfoKey const PKErrorMissingCapabilityKey = @"PKErrorMissingCapability";
 NSErrorUserInfoKey const PKErrorRecoverySuggestionKey = @"PKErrorRecoverySuggestion";
+NSErrorUserInfoKey const PKErrorRollbackFailedKey = @"PKErrorRollbackFailed";
+NSErrorUserInfoKey const PKErrorDependencyChainKey = @"PKErrorDependencyChain";
 
 @implementation NSError (PlugInKit)
 
@@ -91,6 +93,7 @@ NSErrorUserInfoKey const PKErrorRecoverySuggestionKey = @"PKErrorRecoverySuggest
     if (code >= 1600 && code < 1700) return @"Resource";
     if (code >= 1700 && code < 1800) return @"Operation";
     if (code >= 1800 && code < 1900) return @"Hot-Reload";
+    if (code >= 1900 && code < 2000) return @"Dependency";
 
     return @"Unknown";
 }

@@ -125,10 +125,45 @@
         @"supportsDataProcessing": @YES,
         @"supportsCalculation": @YES,
         @"version": self.plugInVersion,
-        @"features": @[@"echo", @"process", @"calculate"]
+        @"features": @[@"echo", @"process", @"calculate"],
+        // The "state" key is read by hot-reload state migration; expose any
+        // values that should survive a reload here.
+        @"state": self.configuration ?: @{}
     };
 
     reply(capabilities);
+}
+
+#pragma mark - PKPlugInProtocol Lifecycle Hooks
+
+- (void)willLoadWithReply:(void (^)(NSError * _Nullable))reply {
+    NSLog(@"[SamplePlugin] willLoad");
+    reply(nil);
+}
+
+- (void)didLoadWithReply:(void (^)(NSError * _Nullable))reply {
+    NSLog(@"[SamplePlugin] didLoad");
+    reply(nil);
+}
+
+- (void)willUnloadWithReply:(void (^)(NSError * _Nullable))reply {
+    NSLog(@"[SamplePlugin] willUnload");
+    reply(nil);
+}
+
+- (void)didUnloadWithReply:(void (^)(NSError * _Nullable))reply {
+    NSLog(@"[SamplePlugin] didUnload");
+    reply(nil);
+}
+
+- (void)willSuspendWithReply:(void (^)(NSError * _Nullable))reply {
+    NSLog(@"[SamplePlugin] willSuspend - pausing work");
+    reply(nil);
+}
+
+- (void)didResumeWithReply:(void (^)(NSError * _Nullable))reply {
+    NSLog(@"[SamplePlugin] didResume - resuming work");
+    reply(nil);
 }
 
 #pragma mark - Plugin Methods (Examples)

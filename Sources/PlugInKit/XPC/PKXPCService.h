@@ -16,6 +16,7 @@ typedef NS_ENUM(NSInteger, PKXPCConnectionState) {
     PKXPCConnectionStateDisconnected,
     PKXPCConnectionStateConnecting,
     PKXPCConnectionStateConnected,
+    PKXPCConnectionStateSuspended,
     PKXPCConnectionStateInterrupted,
     PKXPCConnectionStateInvalidated
 };
@@ -54,6 +55,9 @@ typedef NS_ENUM(NSInteger, PKXPCConnectionState) {
 
 /// Dispatch queue for delegate callbacks
 @property (nonatomic, strong, readonly) dispatch_queue_t delegateQueue;
+
+/// PID of the remote XPC service process, or 0 if not connected
+@property (nonatomic, assign, readonly) pid_t remoteProcessIdentifier;
 
 /// Create a new XPC service
 /// @param serviceName Name of the XPC service
