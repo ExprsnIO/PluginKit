@@ -121,8 +121,42 @@ import PlugInKit
             "supportsReportGeneration": true,
             "version": plugInVersion,
             "platform": "Swift",
-            "features": ["transform", "analyze", "report"]
+            "features": ["transform", "analyze", "report"],
+            // Read by hot-reload state migration.
+            "state": configuration
         ])
+    }
+
+    // MARK: - PKPlugInProtocol Lifecycle Hooks
+
+    @objc public func willLoad(withReply reply: @escaping (Error?) -> Void) {
+        print("[SwiftPlugin] willLoad")
+        reply(nil)
+    }
+
+    @objc public func didLoad(withReply reply: @escaping (Error?) -> Void) {
+        print("[SwiftPlugin] didLoad")
+        reply(nil)
+    }
+
+    @objc public func willUnload(withReply reply: @escaping (Error?) -> Void) {
+        print("[SwiftPlugin] willUnload")
+        reply(nil)
+    }
+
+    @objc public func didUnload(withReply reply: @escaping (Error?) -> Void) {
+        print("[SwiftPlugin] didUnload")
+        reply(nil)
+    }
+
+    @objc public func willSuspend(withReply reply: @escaping (Error?) -> Void) {
+        print("[SwiftPlugin] willSuspend - pausing work")
+        reply(nil)
+    }
+
+    @objc public func didResume(withReply reply: @escaping (Error?) -> Void) {
+        print("[SwiftPlugin] didResume - resuming work")
+        reply(nil)
     }
 
     // MARK: - Plugin Methods

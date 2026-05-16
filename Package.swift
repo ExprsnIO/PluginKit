@@ -52,5 +52,12 @@ let package = Package(
             path: "Sources/PlugInKitProtocol",
             publicHeadersPath: "."
         ),
+
+        // Unit tests for the host framework
+        .testTarget(
+            name: "PlugInKitTests",
+            dependencies: ["PlugInKit", "PlugInKitProtocol"],
+            path: "Tests/PlugInKitTests"
+        ),
     ]
 )

@@ -13,6 +13,13 @@ NS_ASSUME_NONNULL_BEGIN
 @class PKPlugInManager;
 @protocol PKPlugInProtocol;
 
+// Delegate protocols for manager categories. Declared here because Objective-C
+// categories cannot add stored properties; the backing properties live on the
+// base class while the behavior lives in the respective category.
+@protocol PKPlugInManagerLifecycleDelegate;
+@protocol PKPlugInManagerResourceDelegate;
+@protocol PKPlugInManagerDependencyDelegate;
+
 /// Plugin discovery info
 @interface PKPlugInInfo : NSObject
 
@@ -68,6 +75,15 @@ didFailToConnectToPlugIn:(NSString *)identifier
 
 /// Delegate for manager events
 @property (nonatomic, weak, nullable) id<PKPlugInManagerDelegate> delegate;
+
+/// Delegate for plugin lifecycle events (see PKPlugInManager+Lifecycle.h)
+@property (nonatomic, weak, nullable) id<PKPlugInManagerLifecycleDelegate> lifecycleDelegate;
+
+/// Delegate for resource management events (see PKPlugInManager+ResourceManagement.h)
+@property (nonatomic, weak, nullable) id<PKPlugInManagerResourceDelegate> resourceDelegate;
+
+/// Delegate for dependency resolution events (see PKPlugInManager+Dependencies.h)
+@property (nonatomic, weak, nullable) id<PKPlugInManagerDependencyDelegate> dependencyDelegate;
 
 /// All discovered plugins
 @property (nonatomic, copy, readonly) NSArray<PKPlugInInfo *> *discoveredPlugIns;

@@ -6,6 +6,7 @@
 //
 
 #import "PKPlugInManager.h"
+#import "PKPlugInManager+Lifecycle.h"
 #import "../../PlugInKitProtocol/PKPlugInProtocol.h"
 #import "../../PlugInKitProtocol/PKHostProtocol.h"
 
@@ -257,33 +258,71 @@
     }];
 
     NSDictionary *config = configuration ?: @{};
-    [plugin initializeWithConfiguration:config reply:^(NSError * _Nullable error) {
-        if (error) {
-            dispatch_barrier_async(self.managerQueue, ^{
-                [self.connections removeObjectForKey:identifier];
+
+    // Lifecycle hook: didLoad runs after a successful initialization.
+    void (^finishLoad)(void) = ^{
+        id<PKPlugInManagerLifecycleDelegate> lifecycleDelegate = self.lifecycleDelegate;
+        if ([lifecycleDelegate respondsToSelector:@selector(plugInManager:didLoadPlugIn:)]) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [lifecycleDelegate plugInManager:self didLoadPlugIn:identifier];
             });
-
-            if ([self.delegate respondsToSelector:@selector(plugInManager:didFailToConnectToPlugIn:error:)]) {
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    [self.delegate plugInManager:self didFailToConnectToPlugIn:identifier error:error];
-                });
-            }
-
-            if (completion) {
-                completion(nil, error);
-            }
-        } else {
-            if ([self.delegate respondsToSelector:@selector(plugInManager:didEstablishConnection:)]) {
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    [self.delegate plugInManager:self didEstablishConnection:connection];
-                });
-            }
-
-            if (completion) {
-                completion(connection, nil);
-            }
         }
-    }];
+
+        if ([self.delegate respondsToSelector:@selector(plugInManager:didEstablishConnection:)]) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self.delegate plugInManager:self didEstablishConnection:connection];
+            });
+        }
+
+        if (completion) {
+            completion(connection, nil);
+        }
+    };
+
+    void (^proceedToInitialize)(void) = ^{
+        [plugin initializeWithConfiguration:config reply:^(NSError * _Nullable error) {
+            if (error) {
+                dispatch_barrier_async(self.managerQueue, ^{
+                    [self.connections removeObjectForKey:identifier];
+                });
+
+                if ([self.delegate respondsToSelector:@selector(plugInManager:didFailToConnectToPlugIn:error:)]) {
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        [self.delegate plugInManager:self didFailToConnectToPlugIn:identifier error:error];
+                    });
+                }
+
+                if (completion) {
+                    completion(nil, error);
+                }
+                return;
+            }
+
+            if ([plugin respondsToSelector:@selector(didLoadWithReply:)]) {
+                [plugin didLoadWithReply:^(NSError * _Nullable loadError) {
+                    finishLoad();
+                }];
+            } else {
+                finishLoad();
+            }
+        }];
+    };
+
+    // Lifecycle hook: willLoad runs before initialization.
+    id<PKPlugInManagerLifecycleDelegate> lifecycleDelegate = self.lifecycleDelegate;
+    if ([lifecycleDelegate respondsToSelector:@selector(plugInManager:willLoadPlugIn:)]) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [lifecycleDelegate plugInManager:self willLoadPlugIn:identifier];
+        });
+    }
+
+    if ([plugin respondsToSelector:@selector(willLoadWithReply:)]) {
+        [plugin willLoadWithReply:^(NSError * _Nullable error) {
+            proceedToInitialize();
+        }];
+    } else {
+        proceedToInitialize();
+    }
 }
 
 - (void)disconnectFromPlugIn:(NSString *)identifier {
@@ -294,20 +333,44 @@
         [self.connections removeObjectForKey:identifier];
     });
 
-    if (connection) {
-        id<PKPlugInProtocol> plugin = [connection synchronousRemotePlugInWithErrorHandler:^(NSError *error) {
-            NSLog(@"Error disconnecting from plugin %@: %@", identifier, error);
-        }];
+    if (!connection) {
+        return;
+    }
 
-        [plugin prepareForTerminationWithReply:^{
-            [connection stop];
-        }];
+    id<PKPlugInManagerLifecycleDelegate> lifecycleDelegate = self.lifecycleDelegate;
+    if ([lifecycleDelegate respondsToSelector:@selector(plugInManager:willUnloadPlugIn:)]) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [lifecycleDelegate plugInManager:self willUnloadPlugIn:identifier];
+        });
+    }
 
-        if ([self.delegate respondsToSelector:@selector(plugInManager:didRemovePlugIn:)]) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                [self.delegate plugInManager:self didRemovePlugIn:identifier];
-            });
-        }
+    id<PKPlugInProtocol> plugin = [connection synchronousRemotePlugInWithErrorHandler:^(NSError *error) {
+        NSLog(@"Error disconnecting from plugin %@: %@", identifier, error);
+    }];
+
+    // Lifecycle hooks bracket termination while the connection is still live.
+    if ([plugin respondsToSelector:@selector(willUnloadWithReply:)]) {
+        [plugin willUnloadWithReply:^(NSError * _Nullable error) {}];
+    }
+
+    [plugin prepareForTerminationWithReply:^{}];
+
+    if ([plugin respondsToSelector:@selector(didUnloadWithReply:)]) {
+        [plugin didUnloadWithReply:^(NSError * _Nullable error) {}];
+    }
+
+    [connection stop];
+
+    if ([lifecycleDelegate respondsToSelector:@selector(plugInManager:didUnloadPlugIn:)]) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [lifecycleDelegate plugInManager:self didUnloadPlugIn:identifier];
+        });
+    }
+
+    if ([self.delegate respondsToSelector:@selector(plugInManager:didRemovePlugIn:)]) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self.delegate plugInManager:self didRemovePlugIn:identifier];
+        });
     }
 }
 

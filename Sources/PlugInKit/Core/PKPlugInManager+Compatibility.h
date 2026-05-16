@@ -8,6 +8,8 @@
 #import <Foundation/Foundation.h>
 #import "PKPlugInManager.h"
 
+@class PKPlugInDependency;
+
 NS_ASSUME_NONNULL_BEGIN
 
 /// Extended plugin information with versioning
@@ -27,6 +29,13 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// Optional capabilities provided by plugin
 @property (nonatomic, copy, readonly) NSArray<NSString *> *providedCapabilities;
+
+/// Other plugins this plugin depends on (Info.plist key `PKRequiredPlugins`).
+@property (nonatomic, copy, readonly) NSArray<PKPlugInDependency *> *requiredPlugins;
+
+/// Host version at which this plugin becomes deprecated (Info.plist key
+/// `PKDeprecatedAtVersion`), or nil if the plugin is not deprecated.
+@property (nonatomic, copy, readonly, nullable) NSString *deprecatedAtVersion;
 
 @end
 
@@ -89,6 +98,15 @@ compatibleWithMinimum:(nullable NSString *)minimumVersion
 - (void)plugInManager:(PKPlugInManager *)manager
 didRejectIncompatiblePlugIn:(PKPlugInInfo *)plugIn
                reason:(NSString *)reason;
+
+/// Called when a compatible but deprecated plugin is detected. The plugin is
+/// still considered compatible; this is an advisory notification.
+/// @param manager Plugin manager
+/// @param plugIn The deprecated plugin
+/// @param version Host version at which the plugin became deprecated
+- (void)plugInManager:(PKPlugInManager *)manager
+didDetectDeprecatedPlugIn:(PKPlugInInfo *)plugIn
+            atVersion:(NSString *)version;
 
 @end
 

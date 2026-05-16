@@ -7,6 +7,8 @@
 
 #import "PKPlugInManager+Compatibility.h"
 #import "PKError.h"
+#import "PKLogger.h"
+#import "../../PlugInKitProtocol/PKPlugInDependency.h"
 #import <objc/runtime.h>
 
 // Keys for Info.plist
@@ -15,6 +17,8 @@ static NSString *const PKMaximumHostVersionKey = @"PKMaximumHostVersion";
 static NSString *const PKProtocolVersionKey = @"PKProtocolVersion";
 static NSString *const PKRequiredCapabilitiesKey = @"PKRequiredCapabilities";
 static NSString *const PKProvidedCapabilitiesKey = @"PKProvidedCapabilities";
+static NSString *const PKRequiredPlugInsKey = @"PKRequiredPlugins";
+static NSString *const PKDeprecatedAtVersionKey = @"PKDeprecatedAtVersion";
 
 // Global host configuration
 static NSString *_hostVersion = @"1.0.0";
@@ -80,6 +84,41 @@ static const void *PKPlugInInfoBundleKey = &PKPlugInInfoBundleKey;
     }
     NSArray *capabilities = [bundle objectForInfoDictionaryKey:PKProvidedCapabilitiesKey];
     return capabilities ?: @[];
+}
+
+- (NSArray<PKPlugInDependency *> *)requiredPlugins {
+    NSBundle *bundle = [self associatedBundle];
+    if (!bundle) {
+        bundle = [NSBundle bundleWithURL:self.bundleURL];
+        [self setAssociatedBundle:bundle];
+    }
+
+    NSArray *rawEntries = [bundle objectForInfoDictionaryKey:PKRequiredPlugInsKey];
+    if (![rawEntries isKindOfClass:[NSArray class]]) {
+        return @[];
+    }
+
+    NSMutableArray<PKPlugInDependency *> *dependencies = [NSMutableArray array];
+    for (id entry in rawEntries) {
+        if (![entry isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        PKPlugInDependency *dependency = [PKPlugInDependency dependencyWithDictionary:entry];
+        if (dependency) {
+            [dependencies addObject:dependency];
+        }
+    }
+    return [dependencies copy];
+}
+
+- (NSString *)deprecatedAtVersion {
+    NSBundle *bundle = [self associatedBundle];
+    if (!bundle) {
+        bundle = [NSBundle bundleWithURL:self.bundleURL];
+        [self setAssociatedBundle:bundle];
+    }
+    NSString *version = [bundle objectForInfoDictionaryKey:PKDeprecatedAtVersionKey];
+    return [version isKindOfClass:[NSString class]] ? version : nil;
 }
 
 @end
@@ -198,6 +237,25 @@ static const void *PKPlugInInfoBundleKey = &PKPlugInInfoBundleKey;
                                           }];
             }
             return NO;
+        }
+    }
+
+    // Deprecation is advisory: the plugin remains compatible, but the host is
+    // warned if it has reached or passed the plugin's deprecation version.
+    NSString *deprecatedAtVersion = plugIn.deprecatedAtVersion;
+    if (deprecatedAtVersion &&
+        [[self class] compareVersion:[[self class] hostVersion]
+                           toVersion:deprecatedAtVersion] != NSOrderedAscending) {
+        PKLogger *logger = [PKLogger loggerWithCategory:@"Compatibility"];
+        [logger warning:@"[%@] Plugin is deprecated as of host version %@ (current host version %@)",
+         plugIn.identifier, deprecatedAtVersion, [[self class] hostVersion]];
+
+        id<PKPlugInManagerCompatibilityDelegate> delegate =
+            (id<PKPlugInManagerCompatibilityDelegate>)self.delegate;
+        if ([delegate respondsToSelector:@selector(plugInManager:didDetectDeprecatedPlugIn:atVersion:)]) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [delegate plugInManager:self didDetectDeprecatedPlugIn:plugIn atVersion:deprecatedAtVersion];
+            });
         }
     }
 

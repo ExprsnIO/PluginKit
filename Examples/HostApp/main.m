@@ -8,7 +8,10 @@
 #import <Foundation/Foundation.h>
 #import <PlugInKit/PlugInKit.h>
 
-@interface HostAppDelegate : NSObject <PKPlugInManagerDelegate, PKConnectionDelegate>
+@interface HostAppDelegate : NSObject <PKPlugInManagerDelegate,
+                                       PKConnectionDelegate,
+                                       PKPlugInManagerLifecycleDelegate,
+                                       PKPlugInManagerResourceDelegate>
 
 @property (nonatomic, strong) PKPlugInManager *plugInManager;
 
@@ -20,6 +23,8 @@
     if (self = [super init]) {
         _plugInManager = [PKPlugInManager sharedManager];
         _plugInManager.delegate = self;
+        _plugInManager.lifecycleDelegate = self;
+        _plugInManager.resourceDelegate = self;
         _plugInManager.pollingEnabled = YES;
         _plugInManager.defaultPollingInterval = 3.0;
     }
@@ -196,7 +201,31 @@
             NSLog(@"Poll failed: %@", error);
         }
 
-        NSLog(@"\n=== Test Complete ===");
+        [self testLifecycleControl:connection];
+    }];
+}
+
+- (void)testLifecycleControl:(PKConnection *)connection {
+    NSLog(@"\n=== Testing Lifecycle Suspend / Resume ===");
+
+    // Apply a resource limit so the monitor watches this plugin.
+    [self.plugInManager setMemoryLimit:(256 * 1024 * 1024) forPlugIn:connection.plugInIdentifier];
+    NSLog(@"Set 256 MB memory limit on %@", connection.plugInIdentifier);
+
+    [self.plugInManager suspendPlugIn:connection.plugInIdentifier completion:^(NSError * _Nullable error) {
+        if (error) {
+            NSLog(@"Suspend reported: %@", error.localizedDescription);
+        }
+        NSLog(@"Plugin suspended (state=%ld)", (long)connection.state);
+
+        [self.plugInManager resumePlugIn:connection.plugInIdentifier completion:^(NSError * _Nullable resumeError) {
+            if (resumeError) {
+                NSLog(@"Resume failed: %@", resumeError);
+            } else {
+                NSLog(@"Plugin resumed (state=%ld)", (long)connection.state);
+            }
+            NSLog(@"\n=== Test Complete ===");
+        }];
     }];
 }
 
@@ -273,6 +302,54 @@ didFailToConnectToPlugIn:(NSString *)identifier
 
 - (void)connection:(PKConnection *)connection didCompletePoll:(BOOL)success latency:(NSTimeInterval)latency {
     NSLog(@"[Delegate] Poll %@ - latency: %.3fs", success ? @"succeeded" : @"failed", latency);
+}
+
+#pragma mark - PKPlugInManagerLifecycleDelegate
+
+- (void)plugInManager:(PKPlugInManager *)manager willLoadPlugIn:(NSString *)identifier {
+    NSLog(@"[Lifecycle] willLoad: %@", identifier);
+}
+
+- (void)plugInManager:(PKPlugInManager *)manager didLoadPlugIn:(NSString *)identifier {
+    NSLog(@"[Lifecycle] didLoad: %@", identifier);
+}
+
+- (void)plugInManager:(PKPlugInManager *)manager willUnloadPlugIn:(NSString *)identifier {
+    NSLog(@"[Lifecycle] willUnload: %@", identifier);
+}
+
+- (void)plugInManager:(PKPlugInManager *)manager didUnloadPlugIn:(NSString *)identifier {
+    NSLog(@"[Lifecycle] didUnload: %@", identifier);
+}
+
+- (void)plugInManager:(PKPlugInManager *)manager willSuspendPlugIn:(NSString *)identifier {
+    NSLog(@"[Lifecycle] suspended: %@", identifier);
+}
+
+- (void)plugInManager:(PKPlugInManager *)manager didResumePlugIn:(NSString *)identifier {
+    NSLog(@"[Lifecycle] resumed: %@", identifier);
+}
+
+#pragma mark - PKPlugInManagerResourceDelegate
+
+- (void)plugInManager:(PKPlugInManager *)manager
+       plugIn:(NSString *)identifier
+ didExceedMemoryLimit:(size_t)limitBytes
+              current:(size_t)currentBytes {
+    NSLog(@"[Resource] %@ exceeded memory limit: %zu > %zu", identifier, currentBytes, limitBytes);
+}
+
+- (void)plugInManager:(PKPlugInManager *)manager
+       plugIn:(NSString *)identifier
+    didExceedCPULimit:(double)limitPercentage
+              current:(double)currentPercentage {
+    NSLog(@"[Resource] %@ exceeded CPU limit: %.1f%% > %.1f%%", identifier, currentPercentage, limitPercentage);
+}
+
+- (void)plugInManager:(PKPlugInManager *)manager
+didDisconnectPlugInForResourceViolation:(NSString *)identifier
+                error:(NSError *)error {
+    NSLog(@"[Resource] %@ disconnected for resource violation: %@", identifier, error.localizedDescription);
 }
 
 @end

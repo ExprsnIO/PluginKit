@@ -44,6 +44,7 @@ typedef NS_ERROR_ENUM(PKErrorDomain, PKError) {
     PKErrorProtocolMismatch         = 1302,
     PKErrorHostVersionTooOld        = 1303,
     PKErrorHostVersionTooNew        = 1304,
+    PKErrorDeprecatedPlugIn         = 1305,
 
     // Plugin errors (1400-1499)
     PKErrorPlugInInitializationFailed = 1400,
@@ -77,6 +78,13 @@ typedef NS_ERROR_ENUM(PKErrorDomain, PKError) {
     PKErrorReloadInProgress         = 1801,
     PKErrorStateMigrationFailed     = 1802,
     PKErrorVersionDowngradeNotAllowed = 1803,
+    PKErrorRollbackFailed           = 1804,
+
+    // Dependency errors (1900-1999)
+    PKErrorCircularDependency       = 1900,
+    PKErrorMissingDependency        = 1901,
+    PKErrorDependencyVersionMismatch = 1902,
+    PKErrorDependencyResolutionFailed = 1903,
 };
 
 /// User info keys for additional error information
@@ -86,6 +94,8 @@ FOUNDATION_EXPORT NSErrorUserInfoKey const PKErrorRequiredVersionKey;
 FOUNDATION_EXPORT NSErrorUserInfoKey const PKErrorActualVersionKey;
 FOUNDATION_EXPORT NSErrorUserInfoKey const PKErrorMissingCapabilityKey;
 FOUNDATION_EXPORT NSErrorUserInfoKey const PKErrorRecoverySuggestionKey;
+FOUNDATION_EXPORT NSErrorUserInfoKey const PKErrorRollbackFailedKey;
+FOUNDATION_EXPORT NSErrorUserInfoKey const PKErrorDependencyChainKey;
 
 /// Convenience category for creating PlugInKit errors
 @interface NSError (PlugInKit)
